@@ -9,8 +9,7 @@
  */
 
 import { Actor, log } from 'apify';
-import { PlaywrightCrawler, Configuration } from 'crawlee';
-import { Page } from 'playwright';
+import { PlaywrightCrawler } from 'crawlee';
 
 // Centris.ca configuration
 const CENTRIS_BASE_URL = 'https://www.centris.ca';
