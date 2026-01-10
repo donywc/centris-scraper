@@ -243,44 +243,39 @@ async function extractListingDetails(page, basicListing) {
     const details = { ...basicListing };
     
     try {
-        await page.waitForTimeout(2000);
+        // Wait for page to fully load
+        await page.waitForLoadState('domcontentloaded');
+        await page.waitForTimeout(1500);
         
         // Extract all details using page.evaluate for better performance
         const pageData = await page.evaluate(() => {
             const data = {};
             
-            // Get title
+            // Get title - with null check
             const titleEl = document.querySelector('h1, [itemprop="name"], .property-title');
-            if (titleEl) data.listingTitle = titleEl.textContent.trim();
+            if (titleEl) data.listingTitle = titleEl.textContent?.trim() || null;
             
             // Get full address
             const addressEl = document.querySelector('[itemprop="address"], .property-address, .address-container');
             if (addressEl) {
-                data.fullAddress = addressEl.textContent.trim().replace(/\s+/g, ' ');
+                data.fullAddress = addressEl.textContent?.trim()?.replace(/\s+/g, ' ') || null;
             }
             
             // Get price
             const priceEl = document.querySelector('[itemprop="price"], .price, .property-price');
             if (priceEl) {
-                data.priceFormatted = priceEl.textContent.trim();
-                data.price = parseInt(data.priceFormatted.replace(/[^0-9]/g, ''), 10) || null;
+                data.priceFormatted = priceEl.textContent?.trim() || null;
+                if (data.priceFormatted) {
+                    data.price = parseInt(data.priceFormatted.replace(/[^0-9]/g, ''), 10) || null;
+                }
             }
             
             // Get description
             const descEl = document.querySelector('[itemprop="description"], .property-description, .description');
-            if (descEl) data.propertyDescription = descEl.textContent.trim();
+            if (descEl) data.propertyDescription = descEl.textContent?.trim() || null;
             
-            // Get all specs/features
-            const specRows = document.querySelectorAll('.teaser, .carac-container, .property-specs tr, .characteristics li, [class*="spec"], [class*="feature"]');
-            const specs = [];
-            specRows.forEach(row => {
-                const text = row.textContent.trim();
-                if (text) specs.push(text);
-            });
-            data.rawSpecs = specs;
-            
-            // Parse specs for specific values
-            const allText = document.body.textContent;
+            // Parse specs for specific values from body text
+            const allText = document.body?.textContent || '';
             
             // Bedrooms
             const bedMatch = allText.match(/(\d+)\s*(chambre|bedroom|ch\b|cac)/i);
@@ -314,49 +309,50 @@ async function extractListingDetails(page, basicListing) {
                     images.push(src);
                 }
             });
-            data.images = images;
+            data.images = images.length > 0 ? images : null;
             
-            // Get broker info
+            // Get broker info with null checks
             const brokerEl = document.querySelector('.broker-info, .agent-info, [class*="courtier"], [class*="broker"]');
             if (brokerEl) {
-                data.brokerName = brokerEl.querySelector('.name, h3, h4, strong')?.textContent?.trim();
-                data.brokerAgency = brokerEl.querySelector('.agency, .banner, [class*="agency"]')?.textContent?.trim();
+                data.brokerName = brokerEl.querySelector('.name, h3, h4, strong')?.textContent?.trim() || null;
+                data.brokerAgency = brokerEl.querySelector('.agency, .banner, [class*="agency"]')?.textContent?.trim() || null;
                 const phoneEl = brokerEl.querySelector('a[href^="tel:"], .phone');
-                if (phoneEl) data.brokerPhone = phoneEl.href?.replace('tel:', '') || phoneEl.textContent?.trim();
+                if (phoneEl) data.brokerPhone = phoneEl.href?.replace('tel:', '') || phoneEl.textContent?.trim() || null;
             }
             
             return data;
         });
         
         // Merge page data into details
-        Object.assign(details, pageData);
-        
-        // Build proper address object
-        if (pageData.fullAddress) {
-            const parts = pageData.fullAddress.split(',').map(p => p.trim());
-            details.address = {
-                fullAddress: pageData.fullAddress,
-                street: parts[0] || null,
-                city: parts[1] || null,
-                region: parts[2] || null
-            };
+        if (pageData) {
+            Object.assign(details, pageData);
+            
+            // Build proper address object
+            if (pageData.fullAddress) {
+                const parts = pageData.fullAddress.split(',').map(p => p.trim());
+                details.address = {
+                    fullAddress: pageData.fullAddress,
+                    street: parts[0] || null,
+                    city: parts[1] || null,
+                    region: parts[2] || null
+                };
+            }
+            
+            // Build broker object
+            if (pageData.brokerName || pageData.brokerAgency || pageData.brokerPhone) {
+                details.broker = {
+                    name: pageData.brokerName || null,
+                    agency: pageData.brokerAgency || null,
+                    phone: pageData.brokerPhone || null
+                };
+            }
+            
+            // Clean up temporary fields
+            delete details.fullAddress;
+            delete details.brokerName;
+            delete details.brokerAgency;
+            delete details.brokerPhone;
         }
-        
-        // Build broker object
-        if (pageData.brokerName || pageData.brokerAgency || pageData.brokerPhone) {
-            details.broker = {
-                name: pageData.brokerName || null,
-                agency: pageData.brokerAgency || null,
-                phone: pageData.brokerPhone || null
-            };
-        }
-        
-        // Clean up temporary fields
-        delete details.fullAddress;
-        delete details.brokerName;
-        delete details.brokerAgency;
-        delete details.brokerPhone;
-        delete details.rawSpecs;
         
     } catch (error) {
         log.warning(`Error extracting details: ${error.message}`);
