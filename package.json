@@ -1,0 +1,33 @@
+{
+  "name": "centris-quebec-scraper",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Apify Actor to scrape property listings from Centris.ca - Quebec's largest real estate platform",
+  "author": "DC Immobilier",
+  "license": "MIT",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "node src/main.js",
+    "test": "echo \"No tests configured\" && exit 0"
+  },
+  "dependencies": {
+    "apify": "^3.1.0",
+    "crawlee": "^3.5.0",
+    "playwright": "^1.40.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "apify",
+    "actor",
+    "scraper",
+    "centris",
+    "real-estate",
+    "quebec",
+    "montreal",
+    "property",
+    "immobilier",
+    "mls"
+  ]
+}

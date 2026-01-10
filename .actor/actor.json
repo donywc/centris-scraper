@@ -1,0 +1,17 @@
+{
+  "actorSpecification": 1,
+  "name": "centris-quebec-scraper",
+  "title": "Centris.ca Quebec Real Estate Scraper",
+  "description": "Scrapes property listings from Centris.ca based on location, price, bedrooms, bathrooms, and other criteria. Supports both French and English. Ideal for Quebec real estate market analysis.",
+  "version": "1.0",
+  "buildTag": "latest",
+  "defaultMemoryMbytes": 4096,
+  "minMemoryMbytes": 2048,
+  "maxMemoryMbytes": 8192,
+  "dockerfile": "../Dockerfile",
+  "readme": "../README.md",
+  "input": "./input_schema.json",
+  "storages": {
+    "dataset": "./dataset_schema.json"
+  }
+}

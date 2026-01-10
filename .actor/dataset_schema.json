@@ -1,0 +1,201 @@
+{
+  "actorSpecification": 1,
+  "fields": {
+    "id": {
+      "type": "string",
+      "title": "Centris ID",
+      "description": "Unique Centris listing identifier"
+    },
+    "url": {
+      "type": "string",
+      "title": "Listing URL",
+      "description": "Direct link to the property listing"
+    },
+    "title": {
+      "type": "string",
+      "title": "Title",
+      "description": "Property listing title"
+    },
+    "address": {
+      "type": "object",
+      "title": "Address",
+      "description": "Full address details",
+      "properties": {
+        "street": { "type": "string" },
+        "city": { "type": "string" },
+        "neighborhood": { "type": "string" },
+        "region": { "type": "string" },
+        "postalCode": { "type": "string" },
+        "fullAddress": { "type": "string" }
+      }
+    },
+    "price": {
+      "type": "number",
+      "title": "Price",
+      "description": "Listing price in CAD"
+    },
+    "priceFormatted": {
+      "type": "string",
+      "title": "Price (Formatted)",
+      "description": "Price with currency formatting"
+    },
+    "propertyType": {
+      "type": "string",
+      "title": "Property Type",
+      "description": "Type of property (House, Condo, Plex, etc.)"
+    },
+    "transactionType": {
+      "type": "string",
+      "title": "Transaction Type",
+      "description": "Buy or Rent"
+    },
+    "bedrooms": {
+      "type": "integer",
+      "title": "Bedrooms",
+      "description": "Number of bedrooms"
+    },
+    "bathrooms": {
+      "type": "integer",
+      "title": "Bathrooms",
+      "description": "Number of bathrooms"
+    },
+    "halfBathrooms": {
+      "type": "integer",
+      "title": "Half Bathrooms",
+      "description": "Number of half bathrooms (powder rooms)"
+    },
+    "livingArea": {
+      "type": "number",
+      "title": "Living Area (sq ft)",
+      "description": "Interior living space in square feet"
+    },
+    "lotSize": {
+      "type": "number",
+      "title": "Lot Size (sq ft)",
+      "description": "Total lot/terrain size in square feet"
+    },
+    "yearBuilt": {
+      "type": "integer",
+      "title": "Year Built",
+      "description": "Year of construction"
+    },
+    "parkingSpaces": {
+      "type": "integer",
+      "title": "Parking Spaces",
+      "description": "Number of parking spaces"
+    },
+    "garageSpaces": {
+      "type": "integer",
+      "title": "Garage Spaces",
+      "description": "Number of garage spaces"
+    },
+    "features": {
+      "type": "array",
+      "title": "Features",
+      "description": "List of property features and amenities",
+      "items": { "type": "string" }
+    },
+    "description": {
+      "type": "string",
+      "title": "Description",
+      "description": "Full property description"
+    },
+    "images": {
+      "type": "array",
+      "title": "Image URLs",
+      "description": "List of property image URLs",
+      "items": { "type": "string" }
+    },
+    "mainImage": {
+      "type": "string",
+      "title": "Main Image",
+      "description": "Primary listing image URL"
+    },
+    "broker": {
+      "type": "object",
+      "title": "Broker Info",
+      "description": "Listing broker/agent information",
+      "properties": {
+        "name": { "type": "string" },
+        "agency": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" }
+      }
+    },
+    "mlsNumber": {
+      "type": "string",
+      "title": "MLS Number",
+      "description": "MLS listing number"
+    },
+    "listingDate": {
+      "type": "string",
+      "title": "Listing Date",
+      "description": "Date when property was listed"
+    },
+    "daysOnMarket": {
+      "type": "integer",
+      "title": "Days on Market",
+      "description": "Number of days the listing has been active"
+    },
+    "municipalTaxes": {
+      "type": "number",
+      "title": "Municipal Taxes",
+      "description": "Annual municipal taxes in CAD"
+    },
+    "schoolTaxes": {
+      "type": "number",
+      "title": "School Taxes",
+      "description": "Annual school taxes in CAD"
+    },
+    "condoFees": {
+      "type": "number",
+      "title": "Condo Fees",
+      "description": "Monthly condo fees (if applicable)"
+    },
+    "coordinates": {
+      "type": "object",
+      "title": "Coordinates",
+      "description": "Geographic coordinates",
+      "properties": {
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" }
+      }
+    },
+    "scrapedAt": {
+      "type": "string",
+      "title": "Scraped At",
+      "description": "Timestamp when data was collected"
+    }
+  },
+  "views": {
+    "overview": {
+      "title": "Overview",
+      "transformation": {
+        "fields": [
+          "id",
+          "title",
+          "price",
+          "propertyType",
+          "bedrooms",
+          "bathrooms",
+          "livingArea",
+          "address",
+          "url"
+        ]
+      },
+      "display": {
+        "component": "table",
+        "properties": {
+          "url": {
+            "label": "Listing URL",
+            "format": "link"
+          },
+          "price": {
+            "label": "Price ($)",
+            "format": "number"
+          }
+        }
+      }
+    }
+  }
+}

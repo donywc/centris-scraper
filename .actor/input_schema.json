@@ -1,0 +1,273 @@
+{
+  "title": "Centris.ca Scraper Input",
+  "description": "Configure search criteria for Centris.ca property listings",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "searchType": {
+      "title": "Search Type",
+      "type": "string",
+      "description": "Type of property transaction",
+      "enum": ["buy", "rent"],
+      "enumTitles": ["Buy / Acheter", "Rent / Louer"],
+      "default": "buy"
+    },
+    "propertyTypes": {
+      "title": "Property Types",
+      "type": "array",
+      "description": "Types of properties to search (leave empty for all)",
+      "editor": "select",
+      "prefill": [],
+      "items": {
+        "type": "string",
+        "enum": [
+          "house",
+          "condo",
+          "plex",
+          "land",
+          "commercial",
+          "farm",
+          "cottage"
+        ],
+        "enumTitles": [
+          "House / Maison",
+          "Condo / Appartement",
+          "Plex (2-5 units)",
+          "Land / Terrain",
+          "Commercial",
+          "Farm / Ferme",
+          "Cottage / Chalet"
+        ]
+      },
+      "sectionCaption": "Property Criteria",
+      "sectionDescription": "Define the type of properties you want to find"
+    },
+    "regions": {
+      "title": "Regions",
+      "type": "array",
+      "description": "Quebec regions to search (e.g., 'Montreal', 'Quebec City', 'Laval', 'Longueuil'). Leave empty for all Quebec.",
+      "editor": "json",
+      "prefill": ["Montreal"]
+    },
+    "neighborhoods": {
+      "title": "Neighborhoods / Arrondissements",
+      "type": "array",
+      "description": "Specific neighborhoods within the selected region (e.g., 'Plateau Mont-Royal', 'Rosemont', 'Verdun')",
+      "editor": "json",
+      "prefill": []
+    },
+    "minPrice": {
+      "title": "Minimum Price ($)",
+      "type": "integer",
+      "description": "Minimum listing price in CAD",
+      "default": 0,
+      "minimum": 0,
+      "sectionCaption": "Price Range",
+      "sectionDescription": "Set your budget limits"
+    },
+    "maxPrice": {
+      "title": "Maximum Price ($)",
+      "type": "integer",
+      "description": "Maximum listing price in CAD. Set to 0 for no limit.",
+      "default": 0,
+      "minimum": 0
+    },
+    "minBedrooms": {
+      "title": "Minimum Bedrooms",
+      "type": "integer",
+      "description": "Minimum number of bedrooms",
+      "default": 0,
+      "minimum": 0,
+      "maximum": 10,
+      "sectionCaption": "Room Configuration",
+      "sectionDescription": "Specify bedroom and bathroom requirements"
+    },
+    "maxBedrooms": {
+      "title": "Maximum Bedrooms",
+      "type": "integer",
+      "description": "Maximum number of bedrooms. Set to 0 for no limit.",
+      "default": 0,
+      "minimum": 0,
+      "maximum": 20
+    },
+    "minBathrooms": {
+      "title": "Minimum Bathrooms",
+      "type": "integer",
+      "description": "Minimum number of bathrooms",
+      "default": 0,
+      "minimum": 0,
+      "maximum": 10
+    },
+    "maxBathrooms": {
+      "title": "Maximum Bathrooms",
+      "type": "integer",
+      "description": "Maximum number of bathrooms. Set to 0 for no limit.",
+      "default": 0,
+      "minimum": 0,
+      "maximum": 15
+    },
+    "minLivingArea": {
+      "title": "Min Living Area (sq ft)",
+      "type": "integer",
+      "description": "Minimum living area in square feet",
+      "default": 0,
+      "minimum": 0,
+      "sectionCaption": "Property Size",
+      "sectionDescription": "Living area and lot size filters"
+    },
+    "maxLivingArea": {
+      "title": "Max Living Area (sq ft)",
+      "type": "integer",
+      "description": "Maximum living area in square feet. Set to 0 for no limit.",
+      "default": 0,
+      "minimum": 0
+    },
+    "minLotSize": {
+      "title": "Min Lot Size (sq ft)",
+      "type": "integer",
+      "description": "Minimum lot/terrain size in square feet",
+      "default": 0,
+      "minimum": 0
+    },
+    "maxLotSize": {
+      "title": "Max Lot Size (sq ft)",
+      "type": "integer",
+      "description": "Maximum lot/terrain size in square feet. Set to 0 for no limit.",
+      "default": 0,
+      "minimum": 0
+    },
+    "yearBuiltMin": {
+      "title": "Year Built (Min)",
+      "type": "integer",
+      "description": "Minimum year of construction",
+      "default": 0,
+      "minimum": 1800,
+      "maximum": 2030,
+      "sectionCaption": "Property Age",
+      "sectionDescription": "Filter by construction year"
+    },
+    "yearBuiltMax": {
+      "title": "Year Built (Max)",
+      "type": "integer",
+      "description": "Maximum year of construction. Set to 0 for no limit.",
+      "default": 0,
+      "minimum": 0,
+      "maximum": 2030
+    },
+    "features": {
+      "title": "Property Features",
+      "type": "array",
+      "description": "Required property features",
+      "editor": "select",
+      "items": {
+        "type": "string",
+        "enum": [
+          "pool",
+          "garage",
+          "fireplace",
+          "waterfront",
+          "basement",
+          "air_conditioning",
+          "elevator"
+        ],
+        "enumTitles": [
+          "Pool / Piscine",
+          "Garage",
+          "Fireplace / Foyer",
+          "Waterfront / Bord de l'eau",
+          "Basement / Sous-sol",
+          "Air Conditioning / Climatisation",
+          "Elevator / Ascenseur"
+        ]
+      },
+      "prefill": [],
+      "sectionCaption": "Features & Amenities"
+    },
+    "listingAge": {
+      "title": "Listing Age",
+      "type": "string",
+      "description": "How recently the listing was posted",
+      "enum": ["any", "24h", "7days", "30days", "90days"],
+      "enumTitles": [
+        "Any time",
+        "Last 24 hours",
+        "Last 7 days",
+        "Last 30 days",
+        "Last 90 days"
+      ],
+      "default": "any",
+      "sectionCaption": "Listing Filters"
+    },
+    "sortBy": {
+      "title": "Sort Results By",
+      "type": "string",
+      "description": "How to sort the listings",
+      "enum": ["date_desc", "date_asc", "price_asc", "price_desc"],
+      "enumTitles": [
+        "Newest First",
+        "Oldest First",
+        "Price: Low to High",
+        "Price: High to Low"
+      ],
+      "default": "date_desc"
+    },
+    "maxListings": {
+      "title": "Maximum Listings",
+      "type": "integer",
+      "description": "Maximum number of listings to scrape",
+      "default": 100,
+      "minimum": 1,
+      "maximum": 5000,
+      "sectionCaption": "Scraping Settings",
+      "sectionDescription": "Control scraping behavior and limits"
+    },
+    "includeDetails": {
+      "title": "Include Full Details",
+      "type": "boolean",
+      "description": "Scrape detailed property information (slower but more data). When disabled, only basic listing info is collected.",
+      "default": true
+    },
+    "includeImages": {
+      "title": "Include Image URLs",
+      "type": "boolean",
+      "description": "Include all property image URLs in results",
+      "default": true
+    },
+    "language": {
+      "title": "Language / Langue",
+      "type": "string",
+      "description": "Preferred language for results",
+      "enum": ["fr", "en"],
+      "enumTitles": ["Français", "English"],
+      "default": "fr"
+    },
+    "proxyConfiguration": {
+      "title": "Proxy Configuration",
+      "type": "object",
+      "description": "Select proxies to use. Residential proxies recommended for Centris.",
+      "editor": "proxy",
+      "sectionCaption": "Proxy & Performance",
+      "prefill": {
+        "useApifyProxy": true,
+        "apifyProxyGroups": ["RESIDENTIAL"]
+      }
+    },
+    "maxConcurrency": {
+      "title": "Max Concurrency",
+      "type": "integer",
+      "description": "Maximum parallel browser sessions. Lower values reduce detection risk.",
+      "default": 3,
+      "minimum": 1,
+      "maximum": 10
+    },
+    "maxRequestRetries": {
+      "title": "Max Retries",
+      "type": "integer",
+      "description": "Maximum retries per failed request",
+      "default": 3,
+      "minimum": 1,
+      "maximum": 10
+    }
+  },
+  "required": []
+}
