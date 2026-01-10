@@ -97,10 +97,10 @@
       "description": "List of property features and amenities",
       "items": { "type": "string" }
     },
-    "description": {
+    "propertyDescription": {
       "type": "string",
-      "title": "Description",
-      "description": "Full property description"
+      "title": "Property Description",
+      "description": "Full property description text"
     },
     "images": {
       "type": "array",
