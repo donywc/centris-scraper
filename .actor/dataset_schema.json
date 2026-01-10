@@ -3,7 +3,7 @@
   "title": "Centris.ca Scraper Output",
   "description": "Property listings scraped from Centris.ca",
   "fields": {
-    "id": {
+    "centrisId": {
       "type": "string",
       "title": "Centris ID",
       "description": "Unique Centris listing identifier"
@@ -174,7 +174,7 @@
       "title": "Overview",
       "transformation": {
         "fields": [
-          "id",
+          "centrisId",
           "listingTitle",
           "price",
           "propertyType",
