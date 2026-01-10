@@ -1,5 +1,7 @@
 {
   "actorSpecification": 1,
+  "title": "Centris.ca Scraper Output",
+  "description": "Property listings scraped from Centris.ca",
   "fields": {
     "id": {
       "type": "string",
@@ -11,9 +13,9 @@
       "title": "Listing URL",
       "description": "Direct link to the property listing"
     },
-    "title": {
+    "listingTitle": {
       "type": "string",
-      "title": "Title",
+      "title": "Listing Title",
       "description": "Property listing title"
     },
     "address": {
@@ -173,7 +175,7 @@
       "transformation": {
         "fields": [
           "id",
-          "title",
+          "listingTitle",
           "price",
           "propertyType",
           "bedrooms",
