@@ -2,10 +2,11 @@
  * Centris.ca Quebec Real Estate Scraper
  * 
  * Scrapes property listings from Centris.ca with comprehensive filtering options.
- * Uses Playwright for JavaScript rendering and stealth mode to handle anti-bot measures.
+ * Uses Playwright for JavaScript rendering and applies filters post-scrape
+ * since Centris uses complex AJAX/POST-based filtering.
  * 
  * @author DC Immobilier
- * @version 1.1.0
+ * @version 2.0.0
  */
 
 import { Actor, log } from 'apify';
@@ -31,7 +32,30 @@ const REGION_MAP = {
     'levis': 'levis',
     'terrebonne': 'terrebonne',
     'brossard': 'brossard',
-    'repentigny': 'repentigny'
+    'repentigny': 'repentigny',
+    'drummondville': 'drummondville',
+    'saint-jean-sur-richelieu': 'saint-jean-sur-richelieu',
+    'saint-jerome': 'saint-jerome',
+    'granby': 'granby',
+    'blainville': 'blainville',
+    'saint-hyacinthe': 'saint-hyacinthe',
+    'shawinigan': 'shawinigan',
+    'dollard-des-ormeaux': 'dollard-des-ormeaux',
+    'rimouski': 'rimouski',
+    'victoriaville': 'victoriaville',
+    'saint-eustache': 'saint-eustache',
+    'mascouche': 'mascouche'
+};
+
+// Property type mappings
+const PROPERTY_TYPE_MAP = {
+    'house': ['maison', 'house', 'detached', 'unifamiliale'],
+    'condo': ['condo', 'condominium', 'appartement', 'apartment'],
+    'plex': ['plex', 'duplex', 'triplex', 'quadruplex', 'multiplex', 'revenue'],
+    'land': ['terrain', 'land', 'lot'],
+    'commercial': ['commercial', 'industriel', 'industrial'],
+    'farm': ['ferme', 'farm', 'agricole'],
+    'cottage': ['chalet', 'cottage']
 };
 
 await Actor.init();
@@ -70,22 +94,118 @@ const {
 
 // Track statistics
 let listingsScraped = 0;
+let listingsFiltered = 0;
 let pagesScraped = 0;
 let errors = 0;
 
-log.info('Starting Centris.ca scraper with configuration:', {
+log.info('🏠 Starting Centris.ca scraper v2.0 with configuration:', {
     searchType,
     propertyTypes,
     regions,
+    priceRange: { min: minPrice, max: maxPrice },
+    bedrooms: { min: minBedrooms, max: maxBedrooms },
+    bathrooms: { min: minBathrooms, max: maxBathrooms },
     maxListings,
     language
+});
+
+// Log filter criteria for debugging
+log.info('📋 Filter criteria:', {
+    minPrice: minPrice || 'none',
+    maxPrice: maxPrice || 'none',
+    minBedrooms: minBedrooms || 'none',
+    maxBedrooms: maxBedrooms || 'none',
+    minBathrooms: minBathrooms || 'none',
+    maxBathrooms: maxBathrooms || 'none',
+    propertyTypes: propertyTypes.length > 0 ? propertyTypes : 'all'
 });
 
 // Create proxy configuration
 const proxyConfig = await Actor.createProxyConfiguration(proxyConfiguration);
 
 /**
+ * Check if a listing matches the filter criteria
+ */
+function matchesFilters(listing) {
+    // Price filter
+    if (minPrice > 0 && listing.price && listing.price < minPrice) {
+        log.debug(`Filtered out ${listing.centrisId}: price ${listing.price} < minPrice ${minPrice}`);
+        return false;
+    }
+    if (maxPrice > 0 && listing.price && listing.price > maxPrice) {
+        log.debug(`Filtered out ${listing.centrisId}: price ${listing.price} > maxPrice ${maxPrice}`);
+        return false;
+    }
+    
+    // Bedrooms filter
+    if (minBedrooms > 0 && listing.bedrooms !== null && listing.bedrooms < minBedrooms) {
+        log.debug(`Filtered out ${listing.centrisId}: bedrooms ${listing.bedrooms} < minBedrooms ${minBedrooms}`);
+        return false;
+    }
+    if (maxBedrooms > 0 && listing.bedrooms !== null && listing.bedrooms > maxBedrooms) {
+        log.debug(`Filtered out ${listing.centrisId}: bedrooms ${listing.bedrooms} > maxBedrooms ${maxBedrooms}`);
+        return false;
+    }
+    
+    // Bathrooms filter
+    if (minBathrooms > 0 && listing.bathrooms !== null && listing.bathrooms < minBathrooms) {
+        log.debug(`Filtered out ${listing.centrisId}: bathrooms ${listing.bathrooms} < minBathrooms ${minBathrooms}`);
+        return false;
+    }
+    if (maxBathrooms > 0 && listing.bathrooms !== null && listing.bathrooms > maxBathrooms) {
+        log.debug(`Filtered out ${listing.centrisId}: bathrooms ${listing.bathrooms} > maxBathrooms ${maxBathrooms}`);
+        return false;
+    }
+    
+    // Living area filter
+    if (minLivingArea > 0 && listing.livingArea !== null && listing.livingArea < minLivingArea) {
+        log.debug(`Filtered out ${listing.centrisId}: livingArea ${listing.livingArea} < minLivingArea ${minLivingArea}`);
+        return false;
+    }
+    if (maxLivingArea > 0 && listing.livingArea !== null && listing.livingArea > maxLivingArea) {
+        log.debug(`Filtered out ${listing.centrisId}: livingArea ${listing.livingArea} > maxLivingArea ${maxLivingArea}`);
+        return false;
+    }
+    
+    // Year built filter
+    if (yearBuiltMin > 0 && listing.yearBuilt !== null && listing.yearBuilt < yearBuiltMin) {
+        log.debug(`Filtered out ${listing.centrisId}: yearBuilt ${listing.yearBuilt} < yearBuiltMin ${yearBuiltMin}`);
+        return false;
+    }
+    if (yearBuiltMax > 0 && listing.yearBuilt !== null && listing.yearBuilt > yearBuiltMax) {
+        log.debug(`Filtered out ${listing.centrisId}: yearBuilt ${listing.yearBuilt} > yearBuiltMax ${yearBuiltMax}`);
+        return false;
+    }
+    
+    // Property type filter
+    if (propertyTypes.length > 0 && listing.propertyType) {
+        const listingType = listing.propertyType.toLowerCase();
+        let typeMatched = false;
+        
+        for (const requestedType of propertyTypes) {
+            const typeVariants = PROPERTY_TYPE_MAP[requestedType.toLowerCase()] || [requestedType.toLowerCase()];
+            for (const variant of typeVariants) {
+                if (listingType.includes(variant)) {
+                    typeMatched = true;
+                    break;
+                }
+            }
+            if (typeMatched) break;
+        }
+        
+        if (!typeMatched) {
+            log.debug(`Filtered out ${listing.centrisId}: propertyType "${listing.propertyType}" doesn't match ${propertyTypes}`);
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+/**
  * Build region-specific search URL
+ * Note: Centris filtering is primarily done via POST/AJAX, so URL params have limited effect
+ * We scrape more than needed and filter locally for accuracy
  */
 function buildRegionSearchUrl(region, pageNumber = 1) {
     const isFrench = language === 'fr';
@@ -102,6 +222,7 @@ function buildRegionSearchUrl(region, pageNumber = 1) {
             : `${CENTRIS_BASE_URL}/en/properties~for-sale~${regionSlug}`;
     }
     
+    // Add URL params as hints (may not work on all pages but helps in some cases)
     const params = new URLSearchParams();
     
     if (minPrice > 0) params.append('pmin', minPrice.toString());
@@ -127,11 +248,31 @@ function parsePrice(priceStr) {
 }
 
 /**
+ * Parse number from string (for bedrooms, bathrooms, etc)
+ */
+function parseNumber(str) {
+    if (!str) return null;
+    const match = str.match(/(\d+)/);
+    return match ? parseInt(match[1], 10) : null;
+}
+
+/**
  * Extract listings from page using JavaScript evaluation
  */
 async function extractListingsFromPage(page) {
     // Wait for the page to fully load
+    await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(3000);
+    
+    // Scroll to trigger lazy loading
+    await page.evaluate(() => {
+        window.scrollTo(0, document.body.scrollHeight / 2);
+    });
+    await page.waitForTimeout(1000);
+    await page.evaluate(() => {
+        window.scrollTo(0, document.body.scrollHeight);
+    });
+    await page.waitForTimeout(2000);
     
     // Try to extract data directly from the page using evaluate
     const listings = await page.evaluate(() => {
@@ -144,19 +285,24 @@ async function extractListingsFromPage(page) {
             '[data-id]',
             '.property-thumbnail',
             'a.property-thumbnail-summary-link',
-            '.shell'
+            '.shell',
+            '.property-thumbnail-summary'
         ];
         
         let cards = [];
         for (const selector of cardSelectors) {
             cards = document.querySelectorAll(selector);
-            if (cards.length > 0) break;
+            if (cards.length > 0) {
+                console.log(`Found ${cards.length} cards with selector: ${selector}`);
+                break;
+            }
         }
         
         // If no cards found, try to find links to property pages
         if (cards.length === 0) {
-            const allLinks = document.querySelectorAll('a[href*="/fr/"][href*="propriete"], a[href*="/en/"][href*="property"]');
+            const allLinks = document.querySelectorAll('a[href*="/fr/"][href*="~a-vendre~"], a[href*="/en/"][href*="~for-sale~"]');
             cards = allLinks;
+            console.log(`Found ${cards.length} property links`);
         }
         
         cards.forEach((card) => {
@@ -166,67 +312,134 @@ async function extractListingsFromPage(page) {
                 // Try to get the URL
                 let link = card;
                 if (card.tagName !== 'A') {
-                    link = card.querySelector('a[href*="propriete"], a[href*="property"], a.property-thumbnail-summary-link');
+                    link = card.querySelector('a[href*="~a-vendre~"], a[href*="~for-sale~"], a[href*="~a-louer~"], a[href*="~for-rent~"], a.property-thumbnail-summary-link');
                 }
                 
-                if (link) {
+                if (link && link.href) {
                     listing.url = link.href;
-                    // Extract ID from URL
-                    const idMatch = listing.url.match(/(\d{7,})/);
+                    // Extract ID from URL - Centris IDs are typically 8 digits
+                    const idMatch = listing.url.match(/\/(\d{7,8})(?:[?#]|$)/);
                     if (idMatch) listing.centrisId = idMatch[1];
                 }
                 
+                // Skip if no valid URL
+                if (!listing.url || !listing.url.includes('centris.ca')) return;
+                
                 // Get price - try multiple selectors
-                const priceSelectors = ['.price', '.price span', '[class*="price"]', '.property-price'];
-                for (const sel of priceSelectors) {
-                    const priceEl = card.querySelector(sel);
-                    if (priceEl && priceEl.textContent.includes('$')) {
-                        listing.priceFormatted = priceEl.textContent.trim();
-                        listing.price = parseInt(listing.priceFormatted.replace(/[^0-9]/g, ''), 10) || null;
-                        break;
+                const priceSelectors = [
+                    '.price', 
+                    '.price span', 
+                    '[class*="price"]', 
+                    '.property-price',
+                    '.listing-price',
+                    'span[itemprop="price"]'
+                ];
+                
+                for (const selector of priceSelectors) {
+                    const priceEl = card.querySelector(selector);
+                    if (priceEl) {
+                        listing.priceFormatted = priceEl.textContent?.trim();
+                        if (listing.priceFormatted) break;
                     }
                 }
                 
                 // Get address
-                const addressSelectors = ['.address', '.location', '[class*="address"]', '.property-address'];
-                for (const sel of addressSelectors) {
-                    const addressEl = card.querySelector(sel);
-                    if (addressEl) {
-                        listing.address = { fullAddress: addressEl.textContent.trim() };
-                        break;
+                const addressSelectors = [
+                    '.address',
+                    '.property-address', 
+                    '[class*="address"]',
+                    '.location',
+                    'span[itemprop="address"]'
+                ];
+                
+                for (const selector of addressSelectors) {
+                    const addrEl = card.querySelector(selector);
+                    if (addrEl) {
+                        listing.addressText = addrEl.textContent?.trim();
+                        if (listing.addressText) break;
                     }
                 }
                 
                 // Get property type
-                const typeSelectors = ['.category', '.property-type', '[class*="category"]'];
-                for (const sel of typeSelectors) {
-                    const typeEl = card.querySelector(sel);
+                const typeSelectors = [
+                    '.category',
+                    '.property-type',
+                    '[class*="category"]',
+                    '.property-thumbnail-summary-type'
+                ];
+                
+                for (const selector of typeSelectors) {
+                    const typeEl = card.querySelector(selector);
                     if (typeEl) {
-                        listing.propertyType = typeEl.textContent.trim();
-                        break;
+                        listing.propertyType = typeEl.textContent?.trim();
+                        if (listing.propertyType) break;
                     }
                 }
                 
-                // Get bedrooms/bathrooms from text content
-                const cardText = card.textContent;
-                const bedroomMatch = cardText.match(/(\d+)\s*(ch|chambre|bed|cac)/i);
-                if (bedroomMatch) listing.bedrooms = parseInt(bedroomMatch[1], 10);
+                // Get bedrooms/bathrooms from features text
+                const featureSelectors = [
+                    '.cac',
+                    '.features',
+                    '[class*="feature"]',
+                    '.property-thumbnail-summary-bedroom',
+                    '.property-thumbnail-summary-bathroom'
+                ];
                 
-                const bathroomMatch = cardText.match(/(\d+)\s*(sdb|salle|bath)/i);
-                if (bathroomMatch) listing.bathrooms = parseInt(bathroomMatch[1], 10);
-                
-                // Get image
-                const img = card.querySelector('img');
-                if (img) {
-                    listing.mainImage = img.src || img.getAttribute('data-src');
+                let featuresText = '';
+                for (const selector of featureSelectors) {
+                    const featureEls = card.querySelectorAll(selector);
+                    featureEls.forEach(el => {
+                        featuresText += ' ' + (el.textContent || '');
+                    });
                 }
                 
-                // Only add if we have a valid URL
-                if (listing.url && listing.url.includes('centris.ca')) {
+                // Also check for specific bedroom/bathroom elements
+                const bedroomEl = card.querySelector('[class*="bedroom"], [class*="chambre"]');
+                const bathroomEl = card.querySelector('[class*="bathroom"], [class*="salle"]');
+                
+                if (bedroomEl) {
+                    const bedMatch = bedroomEl.textContent?.match(/(\d+)/);
+                    if (bedMatch) listing.bedrooms = parseInt(bedMatch[1], 10);
+                }
+                
+                if (bathroomEl) {
+                    const bathMatch = bathroomEl.textContent?.match(/(\d+)/);
+                    if (bathMatch) listing.bathrooms = parseInt(bathMatch[1], 10);
+                }
+                
+                // Parse from features text if not found
+                if (!listing.bedrooms) {
+                    const bedMatch = featuresText.match(/(\d+)\s*(?:ch|bed|chambre|bedroom)/i);
+                    if (bedMatch) listing.bedrooms = parseInt(bedMatch[1], 10);
+                }
+                
+                if (!listing.bathrooms) {
+                    const bathMatch = featuresText.match(/(\d+)\s*(?:sdb|bath|salle|bathroom)/i);
+                    if (bathMatch) listing.bathrooms = parseInt(bathMatch[1], 10);
+                }
+                
+                // Get main image
+                const imgSelectors = [
+                    'img.property-thumbnail-summary-link-image',
+                    'img[src*="centris"]',
+                    'img[data-src*="centris"]',
+                    'img.property-photo',
+                    'img'
+                ];
+                
+                for (const selector of imgSelectors) {
+                    const imgEl = card.querySelector(selector);
+                    if (imgEl) {
+                        listing.mainImage = imgEl.src || imgEl.dataset?.src;
+                        if (listing.mainImage && listing.mainImage.includes('centris')) break;
+                    }
+                }
+                
+                if (listing.url) {
                     results.push(listing);
                 }
-            } catch (e) {
-                // Skip this card on error
+            } catch (err) {
+                console.error('Error extracting card:', err);
             }
         });
         
@@ -240,157 +453,127 @@ async function extractListingsFromPage(page) {
  * Extract detailed information from a listing page
  */
 async function extractListingDetails(page, basicListing) {
-    const details = { ...basicListing };
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(2000);
     
-    try {
-        // Wait for page to fully load
-        await page.waitForLoadState('domcontentloaded');
-        await page.waitForTimeout(1500);
+    const details = await page.evaluate(() => {
+        const data = {};
         
-        // Extract all details using page.evaluate for better performance
-        const pageData = await page.evaluate(() => {
-            const data = {};
-            
-            // Get title - with null check
-            const titleEl = document.querySelector('h1, [itemprop="name"], .property-title');
-            if (titleEl) data.listingTitle = titleEl.textContent?.trim() || null;
-            
-            // Get full address
-            const addressEl = document.querySelector('[itemprop="address"], .property-address, .address-container');
-            if (addressEl) {
-                data.fullAddress = addressEl.textContent?.trim()?.replace(/\s+/g, ' ') || null;
-            }
-            
-            // Get price
-            const priceEl = document.querySelector('[itemprop="price"], .price, .property-price');
-            if (priceEl) {
-                data.priceFormatted = priceEl.textContent?.trim() || null;
-                if (data.priceFormatted) {
-                    data.price = parseInt(data.priceFormatted.replace(/[^0-9]/g, ''), 10) || null;
-                }
-            }
-            
-            // Get description
-            const descEl = document.querySelector('[itemprop="description"], .property-description, .description');
-            if (descEl) data.propertyDescription = descEl.textContent?.trim() || null;
-            
-            // Parse specs for specific values from body text
-            const allText = document.body?.textContent || '';
-            
-            // Bedrooms
-            const bedMatch = allText.match(/(\d+)\s*(chambre|bedroom|ch\b|cac)/i);
-            if (bedMatch) data.bedrooms = parseInt(bedMatch[1], 10);
-            
-            // Bathrooms  
-            const bathMatch = allText.match(/(\d+)\s*(salle de bain|bathroom|sdb)/i);
-            if (bathMatch) data.bathrooms = parseInt(bathMatch[1], 10);
-            
-            // Year built
-            const yearMatch = allText.match(/(année|year|built|constru)[^\d]*(\d{4})/i);
-            if (yearMatch) data.yearBuilt = parseInt(yearMatch[2], 10);
-            
-            // Living area
-            const areaMatch = allText.match(/([\d\s,]+)\s*(pi²|pc|sq\.?\s*ft)/i);
-            if (areaMatch) data.livingArea = parseInt(areaMatch[1].replace(/[\s,]/g, ''), 10);
-            
-            // MLS Number
-            const mlsMatch = allText.match(/(MLS|Centris)[^\d]*(\d{7,})/i);
-            if (mlsMatch) data.mlsNumber = mlsMatch[2];
-            
-            // Municipal taxes
-            const taxMatch = allText.match(/taxe[s]?\s*municipale[s]?[^\d]*([\d\s,]+)\s*\$/i);
-            if (taxMatch) data.municipalTaxes = parseInt(taxMatch[1].replace(/[\s,]/g, ''), 10);
-            
-            // Get all images
-            const images = [];
-            document.querySelectorAll('img[src*="centris"], img[src*="mspublic"], .gallery img, [class*="photo"] img').forEach(img => {
-                const src = img.src || img.getAttribute('data-src');
-                if (src && !images.includes(src) && !src.includes('logo') && !src.includes('icon')) {
-                    images.push(src);
-                }
-            });
-            data.images = images.length > 0 ? images : null;
-            
-            // Get broker info with null checks
-            const brokerEl = document.querySelector('.broker-info, .agent-info, [class*="courtier"], [class*="broker"]');
-            if (brokerEl) {
-                data.brokerName = brokerEl.querySelector('.name, h3, h4, strong')?.textContent?.trim() || null;
-                data.brokerAgency = brokerEl.querySelector('.agency, .banner, [class*="agency"]')?.textContent?.trim() || null;
-                const phoneEl = brokerEl.querySelector('a[href^="tel:"], .phone');
-                if (phoneEl) data.brokerPhone = phoneEl.href?.replace('tel:', '') || phoneEl.textContent?.trim() || null;
-            }
-            
-            return data;
-        });
-        
-        // Merge page data into details
-        if (pageData) {
-            Object.assign(details, pageData);
-            
-            // Build proper address object
-            if (pageData.fullAddress) {
-                const parts = pageData.fullAddress.split(',').map(p => p.trim());
-                details.address = {
-                    fullAddress: pageData.fullAddress,
-                    street: parts[0] || null,
-                    city: parts[1] || null,
-                    region: parts[2] || null
-                };
-            }
-            
-            // Build broker object
-            if (pageData.brokerName || pageData.brokerAgency || pageData.brokerPhone) {
-                details.broker = {
-                    name: pageData.brokerName || null,
-                    agency: pageData.brokerAgency || null,
-                    phone: pageData.brokerPhone || null
-                };
-            }
-            
-            // Clean up temporary fields
-            delete details.fullAddress;
-            delete details.brokerName;
-            delete details.brokerAgency;
-            delete details.brokerPhone;
+        // Price
+        const priceEl = document.querySelector('.price, [class*="price"], [itemprop="price"]');
+        if (priceEl) {
+            data.priceFormatted = priceEl.textContent?.trim();
         }
         
-    } catch (error) {
-        log.warning(`Error extracting details: ${error.message}`);
-    }
-    
-    details.transactionType = searchType === 'rent' ? 'Rent' : 'Sale';
-    details.scrapedAt = new Date().toISOString();
-    
-    return details;
-}
-
-/**
- * Handle consent/cookie popups
- */
-async function handlePopups(page) {
-    try {
-        const consentSelectors = [
-            '#didomi-notice-agree-button',
-            'button[id*="accept"]',
-            'button[class*="accept"]',
-            '.cookie-banner button',
-            '#onetrust-accept-btn-handler'
+        // Address
+        const addressEl = document.querySelector('.address, [itemprop="address"], .property-address');
+        if (addressEl) {
+            data.fullAddress = addressEl.textContent?.trim();
+        }
+        
+        // Property type / category
+        const categoryEl = document.querySelector('.category, .property-type, h1[itemprop="category"]');
+        if (categoryEl) {
+            data.propertyType = categoryEl.textContent?.trim();
+        }
+        
+        // Features section - bedrooms, bathrooms, living area
+        const allText = document.body.innerText || '';
+        
+        // Bedrooms
+        const bedroomPatterns = [
+            /(\d+)\s*chambre/i,
+            /(\d+)\s*ch\b/i,
+            /(\d+)\s*bedroom/i,
+            /(\d+)\s*bed\b/i,
+            /chambres?\s*[:=]?\s*(\d+)/i
         ];
         
-        for (const selector of consentSelectors) {
-            const button = await page.$(selector);
-            if (button) {
-                await button.click();
-                await page.waitForTimeout(1000);
+        for (const pattern of bedroomPatterns) {
+            const match = allText.match(pattern);
+            if (match) {
+                data.bedrooms = parseInt(match[1], 10);
                 break;
             }
         }
-    } catch (error) {
-        // Ignore popup errors
-    }
+        
+        // Bathrooms  
+        const bathroomPatterns = [
+            /(\d+)\s*salle/i,
+            /(\d+)\s*sdb/i,
+            /(\d+)\s*bathroom/i,
+            /(\d+)\s*bath\b/i,
+            /salles?\s*de\s*bain\s*[:=]?\s*(\d+)/i
+        ];
+        
+        for (const pattern of bathroomPatterns) {
+            const match = allText.match(pattern);
+            if (match) {
+                data.bathrooms = parseInt(match[1], 10);
+                break;
+            }
+        }
+        
+        // Living area
+        const areaPatterns = [
+            /superficie\s*(?:habitable)?\s*[:=]?\s*([\d\s,]+)\s*(?:pi|pc|sf|sqft)/i,
+            /([\d\s,]+)\s*(?:pi|pc|sf|sqft)/i,
+            /living\s*area\s*[:=]?\s*([\d\s,]+)/i
+        ];
+        
+        for (const pattern of areaPatterns) {
+            const match = allText.match(pattern);
+            if (match) {
+                const areaStr = match[1].replace(/[,\s]/g, '');
+                data.livingArea = parseInt(areaStr, 10);
+                break;
+            }
+        }
+        
+        // Year built
+        const yearPatterns = [
+            /année\s*(?:de\s*)?construction\s*[:=]?\s*(\d{4})/i,
+            /built\s*(?:in)?\s*[:=]?\s*(\d{4})/i,
+            /(\d{4})\s*(?:construction|built)/i
+        ];
+        
+        for (const pattern of yearPatterns) {
+            const match = allText.match(pattern);
+            if (match) {
+                data.yearBuilt = parseInt(match[1], 10);
+                break;
+            }
+        }
+        
+        // Description
+        const descEl = document.querySelector('.description, [itemprop="description"], .property-description');
+        if (descEl) {
+            data.description = descEl.textContent?.trim().substring(0, 1000);
+        }
+        
+        // Images
+        const images = [];
+        document.querySelectorAll('img[src*="centris"], img[data-src*="centris"]').forEach(img => {
+            const src = img.src || img.dataset?.src;
+            if (src && !images.includes(src) && src.includes('media.ashx')) {
+                images.push(src);
+            }
+        });
+        data.images = images.slice(0, 20);
+        
+        // Broker info
+        const brokerEl = document.querySelector('.broker-info, .agent-info, [class*="broker"]');
+        if (brokerEl) {
+            data.brokerInfo = brokerEl.textContent?.trim().substring(0, 200);
+        }
+        
+        return data;
+    });
+    
+    return { ...basicListing, ...details };
 }
 
-// Configure the crawler
+// Create the crawler
 const crawler = new PlaywrightCrawler({
     proxyConfiguration: proxyConfig,
     maxConcurrency,
@@ -402,159 +585,177 @@ const crawler = new PlaywrightCrawler({
         launchOptions: {
             headless: true,
             args: [
-                '--disable-blink-features=AutomationControlled',
                 '--no-sandbox',
-                '--disable-setuid-sandbox'
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-accelerated-2d-canvas',
+                '--disable-gpu'
             ]
         }
     },
     
-    preNavigationHooks: [
-        async ({ page }) => {
-            await page.setExtraHTTPHeaders({
-                'Accept-Language': language === 'fr' ? 'fr-CA,fr;q=0.9,en;q=0.8' : 'en-CA,en;q=0.9,fr;q=0.8'
-            });
-            
-            await page.addInitScript(() => {
-                Object.defineProperty(navigator, 'webdriver', {
-                    get: () => false,
-                });
-            });
-        }
-    ],
-    
-    async requestHandler({ request, page }) {
-        const { label } = request.userData;
+    async requestHandler({ request, page, enqueueLinks }) {
+        const url = request.url;
+        const isListingPage = request.userData?.isListingPage;
+        const basicData = request.userData?.basicData;
         
-        log.info(`Processing: ${request.url}`, { label });
+        log.info(`Processing: ${url}`);
         
-        await handlePopups(page);
-        
-        if (label === 'LISTING') {
-            // Process individual listing page
-            const basicListing = request.userData.listing;
-            const detailedListing = await extractListingDetails(page, basicListing);
-            await Actor.pushData(detailedListing);
-            
-            listingsScraped++;
-            await Actor.setStatusMessage(`Scraped ${listingsScraped}/${maxListings} listings`);
-            
-        } else {
-            // Process search results page
-            pagesScraped++;
-            
-            // Wait for page to load
-            await page.waitForTimeout(5000);
-            
-            // Try to scroll to load more content
-            await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight / 2));
-            await page.waitForTimeout(2000);
-            
-            // Extract listings
-            const listings = await extractListingsFromPage(page);
-            
-            log.info(`Found ${listings.length} listings on page ${pagesScraped}`);
-            
-            // Process listings
-            let processed = 0;
-            for (const listing of listings) {
-                if (listingsScraped + processed >= maxListings) {
-                    break;
+        if (isListingPage && basicData) {
+            // Extract detailed info from individual listing
+            try {
+                const detailedListing = await extractListingDetails(page, basicData);
+                
+                // Parse price if needed
+                if (!detailedListing.price && detailedListing.priceFormatted) {
+                    detailedListing.price = parsePrice(detailedListing.priceFormatted);
                 }
                 
-                if (listing.url) {
-                    if (includeDetails) {
+                // Apply filters
+                if (matchesFilters(detailedListing)) {
+                    detailedListing.transactionType = searchType === 'rent' ? 'Rental' : 'Sale';
+                    detailedListing.scrapedAt = new Date().toISOString();
+                    
+                    await Actor.pushData(detailedListing);
+                    listingsScraped++;
+                    log.info(`✅ Saved listing ${detailedListing.centrisId} - $${detailedListing.price} - ${detailedListing.bedrooms || '?'} bed`);
+                } else {
+                    listingsFiltered++;
+                    log.info(`🚫 Filtered out listing ${detailedListing.centrisId} - $${detailedListing.price} (outside criteria)`);
+                }
+                
+            } catch (err) {
+                log.error(`Error extracting details from ${url}: ${err.message}`);
+                errors++;
+            }
+            
+        } else {
+            // Search results page - extract listings
+            pagesScraped++;
+            
+            try {
+                const listings = await extractListingsFromPage(page);
+                log.info(`Found ${listings.length} listings on page`);
+                
+                // Calculate how many more we need (accounting for filtering)
+                // Scrape extra to account for filtered results
+                const remainingNeeded = (maxListings - listingsScraped) * 2;
+                
+                for (const listing of listings) {
+                    if (listingsScraped >= maxListings) {
+                        log.info(`Reached max listings limit: ${maxListings}`);
+                        break;
+                    }
+                    
+                    // Quick pre-filter based on price if available
+                    if (listing.priceFormatted) {
+                        listing.price = parsePrice(listing.priceFormatted);
+                        
+                        // Quick price check before detailed scraping
+                        if (minPrice > 0 && listing.price && listing.price < minPrice) {
+                            log.debug(`Skipping ${listing.centrisId}: price ${listing.price} below min ${minPrice}`);
+                            listingsFiltered++;
+                            continue;
+                        }
+                        if (maxPrice > 0 && listing.price && listing.price > maxPrice) {
+                            log.debug(`Skipping ${listing.centrisId}: price ${listing.price} above max ${maxPrice}`);
+                            listingsFiltered++;
+                            continue;
+                        }
+                    }
+                    
+                    if (listing.url && includeDetails) {
+                        // Queue for detailed scraping
                         await crawler.addRequests([{
                             url: listing.url,
                             userData: {
-                                label: 'LISTING',
-                                listing
+                                isListingPage: true,
+                                basicData: listing
                             }
                         }]);
-                    } else {
-                        listing.transactionType = searchType === 'rent' ? 'Rent' : 'Sale';
-                        listing.scrapedAt = new Date().toISOString();
-                        await Actor.pushData(listing);
-                        listingsScraped++;
-                    }
-                    processed++;
-                }
-            }
-            
-            // Look for pagination / next page
-            if (listingsScraped + processed < maxListings && listings.length > 0) {
-                const nextPage = await page.$('a.next, a[rel="next"], .pagination a.active + a, li.next a, [class*="pagination"] a:last-child');
-                if (nextPage) {
-                    const nextUrl = await nextPage.getAttribute('href');
-                    if (nextUrl && !nextUrl.includes('javascript')) {
-                        const fullUrl = nextUrl.startsWith('http') ? nextUrl : `${CENTRIS_BASE_URL}${nextUrl}`;
-                        log.info(`Found next page: ${fullUrl}`);
-                        await crawler.addRequests([{
-                            url: fullUrl,
-                            userData: { label: 'LIST' }
-                        }]);
+                    } else if (listing.url) {
+                        // Save basic data with filters
+                        listing.price = listing.price || parsePrice(listing.priceFormatted);
+                        
+                        if (matchesFilters(listing)) {
+                            listing.transactionType = searchType === 'rent' ? 'Rental' : 'Sale';
+                            listing.scrapedAt = new Date().toISOString();
+                            
+                            await Actor.pushData(listing);
+                            listingsScraped++;
+                        } else {
+                            listingsFiltered++;
+                        }
                     }
                 }
-            }
-            
-            if (!includeDetails) {
-                await Actor.setStatusMessage(`Scraped ${listingsScraped}/${maxListings} listings`);
+                
+                // Try to find and enqueue next page if we need more listings
+                if (listingsScraped < maxListings && listings.length > 0) {
+                    const nextPageSelectors = [
+                        'a.next',
+                        'a[rel="next"]',
+                        '.pagination a:last-child',
+                        'a[title*="suivant"]',
+                        'a[title*="next"]',
+                        '.pager-next a'
+                    ];
+                    
+                    for (const selector of nextPageSelectors) {
+                        try {
+                            const nextLink = await page.$(selector);
+                            if (nextLink) {
+                                const href = await nextLink.getAttribute('href');
+                                if (href) {
+                                    log.info(`Found next page: ${href}`);
+                                    await crawler.addRequests([{
+                                        url: href.startsWith('http') ? href : `${CENTRIS_BASE_URL}${href}`,
+                                        userData: { isListingPage: false }
+                                    }]);
+                                    break;
+                                }
+                            }
+                        } catch (e) {
+                            // Selector not found, try next
+                        }
+                    }
+                }
+                
+            } catch (err) {
+                log.error(`Error extracting from search page ${url}: ${err.message}`);
+                errors++;
             }
         }
     },
     
     async failedRequestHandler({ request, error }) {
-        errors++;
         log.error(`Request failed: ${request.url}`, { error: error.message });
-        
-        await Actor.pushData({
-            url: request.url,
-            error: error.message,
-            '#failed': true
-        });
+        errors++;
     }
 });
 
-// Build initial search URLs
-const startUrls = [];
+// Build initial URLs for each region
+const startUrls = regions.map(region => ({
+    url: buildRegionSearchUrl(region),
+    userData: { isListingPage: false }
+}));
 
-if (regions.length > 0) {
-    for (const region of regions) {
-        startUrls.push({
-            url: buildRegionSearchUrl(region),
-            userData: { label: 'LIST', region }
-        });
-    }
-} else {
-    startUrls.push({
-        url: buildRegionSearchUrl('montreal'),
-        userData: { label: 'LIST' }
-    });
-}
-
-log.info('Starting crawl with URLs:', startUrls.map(u => u.url));
+log.info(`Starting crawl with ${startUrls.length} region(s):`, startUrls.map(u => u.url));
 
 // Run the crawler
 await crawler.run(startUrls);
 
-// Log final statistics
-const stats = {
-    listingsScraped,
+// Log final stats
+log.info('🏁 Scraping complete!', {
+    listingsSaved: listingsScraped,
+    listingsFiltered: listingsFiltered,
     pagesScraped,
     errors,
-    startTime: new Date().toISOString(),
-    input: {
-        searchType,
-        regions,
-        propertyTypes,
-        priceRange: [minPrice, maxPrice],
-        bedrooms: [minBedrooms, maxBedrooms],
-        bathrooms: [minBathrooms, maxBathrooms]
+    filters: {
+        priceRange: `$${minPrice || 0} - $${maxPrice || '∞'}`,
+        bedrooms: `${minBedrooms || 0} - ${maxBedrooms || '∞'}`,
+        bathrooms: `${minBathrooms || 0} - ${maxBathrooms || '∞'}`,
+        propertyTypes: propertyTypes.length > 0 ? propertyTypes.join(', ') : 'all'
     }
-};
-
-log.info('Scraping completed!', stats);
-
-await Actor.setValue('STATS', stats);
+});
 
 await Actor.exit();
