@@ -137,11 +137,14 @@
       "minimum": 0
     },
     "yearBuiltMin": {
-    "type": "integer",
-    "minimum": 0,
-    "default": 0,
-    "description": "Minimum year built (0 = no filter)"
-  }
+      "title": "Year Built (Min)",
+      "type": "integer",
+      "description": "Minimum year of construction. Set to 0 for no filter.",
+      "default": 0,
+      "minimum": 0,
+      "maximum": 2030,
+      "sectionCaption": "Year Built",
+      "sectionDescription": "Filter by construction year"
     },
     "yearBuiltMax": {
       "title": "Year Built (Max)",
@@ -267,3 +270,4 @@
     }
   },
   "required": []
+}
