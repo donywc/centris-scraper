@@ -136,7 +136,7 @@
       "default": 0,
       "minimum": 0
     },
-     "yearBuiltMin": {
+    "yearBuiltMin": {
     "type": "integer",
     "minimum": 0,
     "default": 0,
