@@ -137,14 +137,10 @@
       "minimum": 0
     },
     "yearBuiltMin": {
-      "title": "Year Built (Min)",
-      "type": "integer",
-      "description": "Minimum year of construction",
-      "default": 0,
-      "minimum": 1800,
-      "maximum": 2030,
-      "sectionCaption": "Property Age",
-      "sectionDescription": "Filter by construction year"
+    "type": "integer",
+    "minimum": 0,
+    "default": 0,
+    "description": "Minimum year built (0 = no filter)"
     },
     "yearBuiltMax": {
       "title": "Year Built (Max)",
